@@ -13,6 +13,7 @@ import {
   RefreshControl,
   Alert,
   useWindowDimensions,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -332,7 +333,28 @@ export default function Home() {
           <Text style={styles.footerText}>© {new Date().getFullYear()} · Magazin piese auto import</Text>
         </View>
       </ScrollView>
+
+      {/* FLOATING WHATSAPP BUTTON */}
+      <WhatsappFab phone={settings.phone} />
     </KeyboardAvoidingView>
+  );
+}
+
+function WhatsappFab({ phone }: { phone: string }) {
+  const waNumber = phone.replace(/[^0-9]/g, "");
+  const open = () => {
+    if (!waNumber) return;
+    const msg = encodeURIComponent(
+      "Salut! Am văzut siteul Autoland 07 și aș vrea să întreb despre o piesă."
+    );
+    const url = `https://wa.me/${waNumber}?text=${msg}`;
+    Linking.openURL(url).catch(() => {});
+  };
+  return (
+    <TouchableOpacity testID="whatsapp-fab" onPress={open} style={styles.waFab} activeOpacity={0.85}>
+      <Ionicons name="logo-whatsapp" size={28} color="#fff" />
+      <Text style={styles.waFabText}>WHATSAPP</Text>
+    </TouchableOpacity>
   );
 }
 
@@ -667,4 +689,29 @@ const styles = StyleSheet.create({
     letterSpacing: 4,
   },
   footerText: { fontFamily: "IBMPlexSans_400Regular", color: colors.textDisabled, fontSize: 12, marginTop: 6 },
+
+  waFab: {
+    position: "absolute",
+    right: 20,
+    bottom: 24,
+    backgroundColor: "#25D366",
+    paddingHorizontal: 18,
+    paddingVertical: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 32,
+    shadowColor: "#25D366",
+    shadowOpacity: 0.5,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 10,
+    gap: 8 as any,
+  },
+  waFabText: {
+    fontFamily: "BarlowCondensed_900Black",
+    color: "#fff",
+    letterSpacing: 2,
+    fontSize: 14,
+    marginLeft: 8,
+  },
 });

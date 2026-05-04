@@ -15,6 +15,7 @@ import {
   useWindowDimensions,
   Linking,
 } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
@@ -64,6 +65,13 @@ export default function Home() {
   const [problem, setProblem] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [hasSubmittedEver, setHasSubmittedEver] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem("autoland07_submitted").then((v) => {
+      if (v === "1") setHasSubmittedEver(true);
+    });
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -103,6 +111,8 @@ export default function Home() {
         problem: problem.trim(),
       });
       setSuccess(true);
+      setHasSubmittedEver(true);
+      AsyncStorage.setItem("autoland07_submitted", "1").catch(() => {});
       setName("");
       setContact("");
       setVin("");
@@ -334,8 +344,8 @@ export default function Home() {
         </View>
       </ScrollView>
 
-      {/* FLOATING WHATSAPP BUTTON */}
-      <WhatsappFab phone={settings.phone} />
+      {/* FLOATING WHATSAPP BUTTON - only after inquiry submitted */}
+      {hasSubmittedEver && <WhatsappFab phone={settings.phone} />}
     </KeyboardAvoidingView>
   );
 }

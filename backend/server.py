@@ -114,7 +114,7 @@ class SettingsUpdate(BaseModel):
 
 class InquiryCreate(BaseModel):
     name: str = Field(..., min_length=2, max_length=80)
-    contact: Optional[str] = Field(None, max_length=120)  # phone or email (optional)
+    contact: str = Field(..., min_length=4, max_length=120)  # phone or email (required)
     vin: Optional[str] = Field(None, max_length=40)
     car_model: Optional[str] = Field(None, max_length=120)
     problem: str = Field(..., min_length=5, max_length=2000)
@@ -123,7 +123,7 @@ class InquiryCreate(BaseModel):
 class InquiryOut(BaseModel):
     id: str
     name: str
-    contact: Optional[str] = None
+    contact: str
     vin: Optional[str] = None
     car_model: Optional[str] = None
     problem: str
@@ -170,7 +170,7 @@ async def create_inquiry(payload: InquiryCreate):
     doc = {
         "id": str(uuid.uuid4()),
         "name": payload.name.strip(),
-        "contact": (payload.contact or "").strip() or None,
+        "contact": payload.contact.strip(),
         "vin": (payload.vin or "").strip().upper() or None,
         "car_model": (payload.car_model or "").strip() or None,
         "problem": payload.problem.strip(),

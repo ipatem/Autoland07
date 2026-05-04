@@ -88,15 +88,15 @@ export default function Home() {
   };
 
   const submit = async () => {
-    if (!name.trim() || !problem.trim()) {
-      Alert.alert("Câmpuri lipsă", "Numele și descrierea problemei sunt obligatorii.");
+    if (!name.trim() || !contact.trim() || !problem.trim()) {
+      Alert.alert("Câmpuri lipsă", "Numele, contactul (telefon/email) și descrierea problemei sunt obligatorii.");
       return;
     }
     setSubmitting(true);
     try {
       await apiPost("/inquiries", {
         name: name.trim(),
-        contact: contact.trim() || undefined,
+        contact: contact.trim(),
         vin: vin.trim() || undefined,
         car_model: carModel.trim() || undefined,
         problem: problem.trim(),
@@ -234,12 +234,12 @@ export default function Home() {
                   style={styles.input}
                 />
               </Field>
-              <Field label="TELEFON / EMAIL (OPȚIONAL)">
+              <Field label="TELEFON / EMAIL *">
                 <TextInput
                   testID="contact-input"
                   value={contact}
                   onChangeText={setContact}
-                  placeholder="07xx... sau email@... (ca să te putem contacta)"
+                  placeholder="07xx... sau email@..."
                   placeholderTextColor={colors.textDisabled}
                   style={styles.input}
                   autoCapitalize="none"

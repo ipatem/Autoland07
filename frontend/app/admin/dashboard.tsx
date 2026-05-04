@@ -155,22 +155,30 @@ export default function Dashboard() {
     }
   };
 
-  const deleteInquiry = (id: string) => {
-    Alert.alert("Șterge cerere", "Sigur ștergi această cerere?", [
-      { text: "Anulează", style: "cancel" },
-      {
-        text: "Șterge",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await apiDelete(`/admin/inquiries/${id}`);
-            setInquiries((prev) => prev.filter((x) => x.id !== id));
-          } catch (e: any) {
-            Alert.alert("Eroare", e?.message);
-          }
-        },
-      },
-    ]);
+  const deleteInquiry = async (id: string) => {
+    const confirmed =
+      Platform.OS === "web"
+        ? // eslint-disable-next-line no-alert
+          (typeof window !== "undefined" && window.confirm("Sigur ștergi această cerere?"))
+        : await new Promise<boolean>((resolve) =>
+            Alert.alert("Șterge cerere", "Sigur ștergi această cerere?", [
+              { text: "Anulează", style: "cancel", onPress: () => resolve(false) },
+              { text: "Șterge", style: "destructive", onPress: () => resolve(true) },
+            ]),
+          );
+    if (!confirmed) return;
+    try {
+      await apiDelete(`/admin/inquiries/${id}`);
+      setInquiries((prev) => prev.filter((x) => x.id !== id));
+      setStats((s) => ({ ...s, total: Math.max(0, s.total - 1) }));
+    } catch (e: any) {
+      if (Platform.OS === "web") {
+        // eslint-disable-next-line no-alert
+        window.alert("Eroare: " + (e?.message || ""));
+      } else {
+        Alert.alert("Eroare", e?.message);
+      }
+    }
   };
 
   if (loading || !settings || !settingsDraft) {

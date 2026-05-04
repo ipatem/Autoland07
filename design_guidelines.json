@@ -1,0 +1,164 @@
+{
+  "project_name": "Autoland 07 - Mobile Web App",
+  "theme": "dark",
+  "archetype": "Archetype 2: Performance Pro (Tactical Minimalism) blended with Brutalist Industrial",
+  "design_philosophy": "A robust, mechanical, and high-trust dark interface representing an auto parts store. Employs stark contrasts (Deep Obsidian vs Pure White) and structural grid layouts. The rigid industrial feel is deliberately broken by a colorful, chaotic 'Post-it Note' review wall, fulfilling the 'Fusion over Imitation' E1 principle.",
+  "colors": {
+    "background": {
+      "main": "#0A0A0A",
+      "surface": "#141414",
+      "surface_elevated": "#1F1F1F"
+    },
+    "text": {
+      "primary": "#FFFFFF",
+      "secondary": "#A1A1AA",
+      "disabled": "#52525B",
+      "inverse": "#000000"
+    },
+    "brand": {
+      "primary": "#FF3B30",
+      "primary_hover": "#DC2626",
+      "accent_red": "#EF4444"
+    },
+    "status": {
+      "open": "#10B981",
+      "break": "#F59E0B",
+      "closed": "#EF4444"
+    },
+    "post_it_notes": {
+      "yellow": "#FEF08A",
+      "pink": "#FBCFE8",
+      "cyan": "#BAE6FD",
+      "green": "#D9F99D"
+    }
+  },
+  "typography": {
+    "fonts": {
+      "headings": "Barlow Condensed, sans-serif",
+      "body": "IBM Plex Sans, sans-serif",
+      "handwriting": "Caveat, cursive"
+    },
+    "sizes": {
+      "h1": "text-5xl md:text-6xl tracking-tighter uppercase font-black",
+      "h2": "text-3xl md:text-4xl tracking-tight uppercase font-bold",
+      "h3": "text-xl md:text-2xl tracking-wide uppercase font-semibold",
+      "body": "text-base leading-relaxed",
+      "small": "text-sm tracking-wide uppercase",
+      "post_it": "text-lg md:text-xl leading-snug"
+    }
+  },
+  "spacing_and_layout": {
+    "container": "max-w-7xl mx-auto px-4 md:px-8",
+    "section_gap": "py-24 md:py-32",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-12 gap-6",
+    "surface_strategy": "Flat solid surfaces with sharp 0px border-radius. 1px solid #27272A borders for separation. No soft shadows on industrial elements."
+  },
+  "components": {
+    "buttons": {
+      "primary": "bg-[#FF3B30] text-white font-bold uppercase tracking-widest px-8 py-4 rounded-none hover:bg-[#DC2626] transition-colors border-2 border-[#FF3B30]",
+      "secondary": "bg-transparent text-white font-bold uppercase tracking-widest px-8 py-4 rounded-none border-2 border-white hover:bg-white hover:text-black transition-colors"
+    },
+    "inputs": {
+      "default": "bg-transparent border-b-2 border-[#52525B] text-white px-0 py-3 rounded-none focus:outline-none focus:border-[#FF3B30] focus:ring-0 transition-colors placeholder:text-[#52525B] font-mono text-lg"
+    },
+    "status_badge": {
+      "container": "inline-flex items-center gap-2 px-3 py-1 bg-[#1F1F1F] border border-[#27272A]",
+      "indicator": "w-2 h-2 rounded-full animate-pulse"
+    },
+    "post_it_note": {
+      "container": "relative p-6 shadow-lg aspect-square flex flex-col justify-between transition-transform hover:scale-105 hover:z-10 cursor-pointer",
+      "text": "font-handwriting text-black",
+      "rotations": ["-rotate-3", "rotate-2", "-rotate-1", "rotate-4", "-rotate-2"],
+      "clip_path": "clip-path: polygon(0 0, 100% 0, 100% 90%, 90% 100%, 0 100%)"
+    }
+  },
+  "pages": {
+    "public_home": {
+      "hero_section": {
+        "layout": "Min-h-[80vh] flex flex-col justify-center relative",
+        "background": "Hero image of mechanic/engine with heavy black gradient overlay (bg-gradient-to-t from-[#0A0A0A] via-[#0A0A0A]/80 to-transparent)",
+        "elements": [
+          "Autoland 07 Logo (Red/Black geometric)",
+          "Live Status Badge (e.g. 'În Magazin')",
+          "H1: 'Piese Auto Import. Soluții Rapide.'",
+          "Contact Info Strip (Phone, Email, Schedule)"
+        ]
+      },
+      "inquiry_form": {
+        "layout": "Grid cols-1 md:grid-cols-2 gap-12 items-start py-20",
+        "fields": [
+          "VIN / Serie Șasiu (Text Input, uppercase formatting)",
+          "Model Auto / An (Optional Input)",
+          "Descrie Problema (Textarea, bottom-border style)"
+        ],
+        "action": "Primary Button: 'Trimite Cererea'"
+      },
+      "review_wall": {
+        "layout": "Py-32 bg-[#141414] overflow-hidden",
+        "title": "H2: 'Ce spun clienții' (Stark white, left aligned)",
+        "grid": "Grid of colorful post-it notes (masonry or flex-wrap style). Each note uses random colors (yellow, pink, cyan) and slight rotations to look physically stuck to the screen."
+      }
+    },
+    "admin_dashboard": {
+      "layout": "Control Room Grid (Dense, 1px borders, max utility)",
+      "header": {
+        "elements": [
+          "Status Toggles (În magazin / Pauză / Plecat)",
+          "Quick Edit Schedule/Contact"
+        ]
+      },
+      "inquiries_list": {
+        "style": "Cardless list, tabular data layout, monospace fonts for VINs",
+        "actions": ["Mark Resolved", "Send Review Request link via SMS/WhatsApp"]
+      }
+    }
+  },
+  "animations": {
+    "post_it_hover": "transition-transform duration-200 ease-out hover:scale-110 hover:-translate-y-2 hover:shadow-2xl z-10",
+    "status_pulse": "animate-pulse duration-1000",
+    "form_focus": "transition-colors duration-300 ease-in-out"
+  },
+  "testing_attributes": {
+    "public": [
+      "data-testid='store-status-badge'",
+      "data-testid='vin-input'",
+      "data-testid='problem-textarea'",
+      "data-testid='submit-inquiry-button'",
+      "data-testid='review-post-it-note'"
+    ],
+    "admin": [
+      "data-testid='admin-status-toggle-open'",
+      "data-testid='admin-status-toggle-break'",
+      "data-testid='admin-status-toggle-closed'",
+      "data-testid='inquiry-resolve-button'",
+      "data-testid='send-review-request-button'"
+    ]
+  },
+  "image_urls": [
+    {
+      "category": "hero_background",
+      "url": "https://images.pexels.com/photos/8985664/pexels-photo-8985664.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Close-up of mechanic repairing engine. Darken heavily with CSS overlay."
+    },
+    {
+      "category": "about_mechanic",
+      "url": "https://images.unsplash.com/photo-1663575126968-65d5dd0bcd5b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2OTV8MHwxfHNlYXJjaHwyfHxjYXIlMjBtZWNoYW5pYyUyMHNtaWxpbmclMjBwb3J0cmFpdHxlbnwwfHx8fDE3Nzc4NzUyODV8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Mechanic smiling, lending a human, trustworthy touch to the industrial design."
+    },
+    {
+      "category": "texture_overlay",
+      "url": "https://images.pexels.com/photos/7565157/pexels-photo-7565157.jpeg?auto=compress&cs=tinysrgb&dpr=2&h=650&w=940",
+      "description": "Alternative darker mechanical parts for section backgrounds."
+    }
+  ],
+  "instructions_to_main_agent": [
+    "Use standard Tailwind CSS classes mapping to the variables above.",
+    "Do NOT use generic borders for form inputs; use only bottom borders (border-b-2) to mimic technical forms.",
+    "For the post-it wall, use a CSS grid with specific rotation utilities (`-rotate-3`, `rotate-2`) appended randomly or systematically to elements.",
+    "Load 'Barlow Condensed' for headings and 'Caveat' for post-it notes from Google Fonts.",
+    "Implement the UI primarily for Mobile Web viewports, ensuring large touch targets.",
+    "Use Romanian phrasing in UI: 'În magazin', 'Pauză', 'Plecat' for status.",
+    "Admin routes must be protected.",
+    "Do NOT use placeholder images. Use the URLs provided in `image_urls`."
+  ]
+}

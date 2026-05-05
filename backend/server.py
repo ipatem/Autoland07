@@ -225,6 +225,31 @@ async def submit_review(payload: ReviewCreate):
     return ReviewOut(**{k: doc[k] for k in ("id", "name", "rating", "text", "color", "created_at")})
 
 
+class PublicReviewCreate(BaseModel):
+    name: str = Field(..., min_length=2, max_length=60)
+    rating: int = Field(..., ge=1, le=5)
+    text: str = Field(..., min_length=3, max_length=400)
+
+
+@api_router.post("/reviews/public", response_model=ReviewOut)
+async def submit_public_review(payload: PublicReviewCreate):
+    palette = ["yellow", "pink", "cyan", "green"]
+    color = palette[secrets.randbelow(len(palette))]
+    now = datetime.now(timezone.utc)
+    doc = {
+        "id": str(uuid.uuid4()),
+        "inquiry_id": None,
+        "name": payload.name.strip(),
+        "rating": payload.rating,
+        "text": payload.text.strip(),
+        "color": color,
+        "approved": True,
+        "created_at": now.isoformat(),
+    }
+    await db.reviews.insert_one(doc)
+    return ReviewOut(**{k: doc[k] for k in ("id", "name", "rating", "text", "color", "created_at")})
+
+
 # --- Auth endpoints ---
 @api_router.post("/auth/login", response_model=LoginResponse)
 async def login(payload: LoginRequest):

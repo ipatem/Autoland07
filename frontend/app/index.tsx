@@ -48,6 +48,13 @@ const HERO_IMG =
 
 const POSTIT_ROTATIONS = ["-3deg", "2deg", "-1deg", "4deg", "-2deg", "3deg", "-4deg", "1deg"];
 
+const GOOGLE_MAPS_URL = "https://maps.app.goo.gl/6KXoWbW8smUsgBKSA";
+
+function buildWhatsappLink(phone: string, body: string) {
+  const num = phone.replace(/[^0-9]/g, "");
+  return `https://wa.me/${num}?text=${encodeURIComponent(body)}`;
+}
+
 export default function Home() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -66,6 +73,20 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [hasSubmittedEver, setHasSubmittedEver] = useState(false);
+  const [lastInquiry, setLastInquiry] = useState<{
+    name: string;
+    contact: string;
+    vin?: string;
+    car_model?: string;
+    problem: string;
+  } | null>(null);
+
+  // Public review form state
+  const [reviewName, setReviewName] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewText, setReviewText] = useState("");
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+  const [reviewSuccess, setReviewSuccess] = useState(false);
 
   useEffect(() => {
     AsyncStorage.getItem("autoland07_submitted").then((v) => {
@@ -111,6 +132,13 @@ export default function Home() {
         problem: problem.trim(),
       });
       setSuccess(true);
+      setLastInquiry({
+        name: name.trim(),
+        contact: contact.trim(),
+        vin: vin.trim() || undefined,
+        car_model: carModel.trim() || undefined,
+        problem: problem.trim(),
+      });
       setHasSubmittedEver(true);
       AsyncStorage.setItem("autoland07_submitted", "1").catch(() => {});
       setName("");
@@ -123,6 +151,43 @@ export default function Home() {
     } finally {
       setSubmitting(false);
     }
+  };
+
+  const submitReview = async () => {
+    if (!reviewName.trim() || !reviewText.trim()) {
+      Alert.alert("Câmpuri lipsă", "Numele și mesajul sunt obligatorii.");
+      return;
+    }
+    setReviewSubmitting(true);
+    try {
+      const created = await apiPost<Review>("/reviews/public", {
+        name: reviewName.trim(),
+        rating: reviewRating,
+        text: reviewText.trim(),
+      });
+      setReviews((prev) => [created, ...prev]);
+      setReviewSuccess(true);
+      setReviewName("");
+      setReviewText("");
+      setReviewRating(5);
+    } catch (e: any) {
+      Alert.alert("Eroare", e?.message || "Nu am putut trimite recenzia.");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const sendInquiryOnWhatsapp = () => {
+    if (!lastInquiry || !settings) return;
+    const lines = [
+      "*Cerere nouă Autoland 07*",
+      `Nume: ${lastInquiry.name}`,
+      `Contact: ${lastInquiry.contact}`,
+    ];
+    if (lastInquiry.vin) lines.push(`VIN: ${lastInquiry.vin}`);
+    if (lastInquiry.car_model) lines.push(`Model: ${lastInquiry.car_model}`);
+    lines.push("", `Problema: ${lastInquiry.problem}`);
+    Linking.openURL(buildWhatsappLink(settings.phone, lines.join("\n"))).catch(() => {});
   };
 
   if (!settings) {
@@ -189,11 +254,30 @@ export default function Home() {
 
         {/* CONTACT STRIP */}
         <View style={styles.contactStrip}>
-          <ContactRow icon="call" label="TELEFON" value={settings.phone} accent />
+          <ContactRow
+            icon="call"
+            label="TELEFON"
+            value={settings.phone}
+            accent
+            onPress={() => Linking.openURL(`tel:${settings.phone.replace(/\s/g, "")}`).catch(() => {})}
+            testID="contact-phone"
+          />
           <View style={styles.divider} />
-          <ContactRow icon="mail" label="EMAIL" value={settings.email} />
+          <ContactRow
+            icon="mail"
+            label="EMAIL"
+            value={settings.email}
+            onPress={() => Linking.openURL(`mailto:${settings.email}`).catch(() => {})}
+            testID="contact-email"
+          />
           <View style={styles.divider} />
-          <ContactRow icon="location" label="ADRESĂ" value={settings.address} />
+          <ContactRow
+            icon="location"
+            label="ADRESĂ · DESCHIDE PE GOOGLE MAPS"
+            value={settings.address}
+            onPress={() => Linking.openURL(GOOGLE_MAPS_URL).catch(() => {})}
+            testID="contact-address"
+          />
           <View style={styles.divider} />
           <View style={styles.scheduleBlock}>
             <View style={styles.scheduleHead}>
@@ -225,6 +309,14 @@ export default function Home() {
               <Text style={styles.successText}>
                 Mihai te va contacta în cel mai scurt timp pe datele de contact lăsate.
               </Text>
+              <TouchableOpacity
+                testID="forward-whatsapp-button"
+                style={styles.waForwardBtn}
+                onPress={sendInquiryOnWhatsapp}
+              >
+                <Ionicons name="logo-whatsapp" size={22} color="#fff" />
+                <Text style={styles.waForwardText}>TRIMITE ȘI PE WHATSAPP</Text>
+              </TouchableOpacity>
               <TouchableOpacity
                 testID="send-another-button"
                 style={styles.secondaryBtn}
@@ -324,6 +416,76 @@ export default function Home() {
             Mesaje primite de la oameni care au găsit piesa potrivită la noi.
           </Text>
 
+          {/* PUBLIC REVIEW FORM */}
+          <View style={styles.reviewFormBox}>
+            <Text style={styles.reviewFormTitle}>LASĂ ȘI TU O PĂRERE</Text>
+            <Text style={styles.reviewFormSub}>
+              Apare instant pe perete ca post-it.
+            </Text>
+            {reviewSuccess ? (
+              <View testID="review-success" style={styles.reviewSuccessBox}>
+                <Ionicons name="checkmark-circle" size={28} color={colors.open} />
+                <Text style={styles.reviewSuccessText}>Mulțumim! Părerea ta a apărut pe perete.</Text>
+                <TouchableOpacity onPress={() => setReviewSuccess(false)}>
+                  <Text style={styles.reviewSuccessLink}>SCRIE ALTĂ PĂRERE</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <TextInput
+                  testID="public-review-name"
+                  value={reviewName}
+                  onChangeText={setReviewName}
+                  placeholder="Numele tău"
+                  placeholderTextColor={colors.textDisabled}
+                  style={styles.input}
+                  maxLength={60}
+                />
+                <View style={styles.starsRowSmall}>
+                  {[1, 2, 3, 4, 5].map((n) => (
+                    <TouchableOpacity
+                      key={n}
+                      testID={`public-star-${n}`}
+                      onPress={() => setReviewRating(n)}
+                      style={{ padding: 4 }}
+                    >
+                      <Ionicons
+                        name={n <= reviewRating ? "star" : "star-outline"}
+                        size={28}
+                        color={n <= reviewRating ? "#F59E0B" : colors.textDisabled}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <TextInput
+                  testID="public-review-text"
+                  value={reviewText}
+                  onChangeText={setReviewText}
+                  placeholder="ex: Am găsit piesa rapid, recomand!"
+                  placeholderTextColor={colors.textDisabled}
+                  style={[styles.input, styles.textarea]}
+                  multiline
+                  maxLength={400}
+                />
+                <TouchableOpacity
+                  testID="submit-public-review-button"
+                  style={[styles.primaryBtn, reviewSubmitting && { opacity: 0.6 }]}
+                  onPress={submitReview}
+                  disabled={reviewSubmitting}
+                >
+                  {reviewSubmitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <>
+                      <Text style={styles.primaryBtnText}>LIPEȘTE PE PERETE</Text>
+                      <Ionicons name="arrow-forward" size={20} color="#fff" />
+                    </>
+                  )}
+                </TouchableOpacity>
+              </>
+            )}
+          </View>
+
           {reviews.length === 0 ? (
             <View style={styles.emptyReviews}>
               <Ionicons name="chatbubbles-outline" size={48} color={colors.textDisabled} />
@@ -382,14 +544,19 @@ function ContactRow({
   label,
   value,
   accent,
+  onPress,
+  testID,
 }: {
   icon: any;
   label: string;
   value: string;
   accent?: boolean;
+  onPress?: () => void;
+  testID?: string;
 }) {
+  const Wrapper: any = onPress ? TouchableOpacity : View;
   return (
-    <View style={styles.contactRow}>
+    <Wrapper testID={testID} onPress={onPress} style={styles.contactRow} activeOpacity={0.7}>
       <View style={styles.contactIconWrap}>
         <Ionicons name={icon} size={18} color={accent ? colors.brand : colors.textSecondary} />
       </View>
@@ -397,7 +564,8 @@ function ContactRow({
         <Text style={styles.contactLabel}>{label}</Text>
         <Text style={[styles.contactValue, accent && { color: colors.brand }]}>{value}</Text>
       </View>
-    </View>
+      {!!onPress && <Ionicons name="open-outline" size={16} color={colors.textDisabled} />}
+    </Wrapper>
   );
 }
 
@@ -723,5 +891,59 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     fontSize: 14,
     marginLeft: 8,
+  },
+
+  waForwardBtn: {
+    flexDirection: "row",
+    backgroundColor: "#25D366",
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 18,
+    width: "100%",
+    gap: 10 as any,
+  },
+  waForwardText: {
+    fontFamily: "BarlowCondensed_900Black",
+    color: "#fff",
+    letterSpacing: 2,
+    fontSize: 14,
+    marginLeft: 8,
+  },
+
+  reviewFormBox: {
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 20,
+    marginBottom: 32,
+  },
+  reviewFormTitle: {
+    fontFamily: "BarlowCondensed_900Black",
+    fontSize: 22,
+    color: "#fff",
+    letterSpacing: 1,
+  },
+  reviewFormSub: {
+    fontFamily: "IBMPlexSans_400Regular",
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 16,
+  },
+  starsRowSmall: { flexDirection: "row", marginTop: 14, marginBottom: 6 },
+  reviewSuccessBox: { alignItems: "center", paddingVertical: 12 },
+  reviewSuccessText: {
+    fontFamily: "IBMPlexSans_500Medium",
+    color: "#fff",
+    marginTop: 8,
+    textAlign: "center",
+  },
+  reviewSuccessLink: {
+    fontFamily: "BarlowCondensed_700Bold",
+    color: colors.brand,
+    letterSpacing: 2,
+    marginTop: 12,
   },
 });

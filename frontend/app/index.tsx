@@ -23,7 +23,7 @@ import { useRouter } from "expo-router";
 import { apiGet, apiPost } from "../src/api";
 import { colors, statusLabels } from "../src/theme";
 import Select from "../src/Select";
-import { CAR_BRAND_LIST, modelsForBrand, CAR_YEARS } from "../src/cars";
+import { CAR_BRAND_LIST, modelsForBrand, CAR_YEARS, normalizeBrand, normalizeModel } from "../src/cars";
 
 interface Settings {
   phone: string;
@@ -73,6 +73,12 @@ export default function Home() {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
+  const [inputMode, setInputMode] = useState<"dropdown" | "manual">("dropdown");
+  const [vinDecoding, setVinDecoding] = useState(false);
+  const [vinResult, setVinResult] = useState<{
+    label: string;
+    success: boolean;
+  } | null>(null);
   const [problem, setProblem] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -195,6 +201,55 @@ export default function Home() {
     if (lastInquiry.car_model) lines.push(`Model: ${lastInquiry.car_model}`);
     lines.push("", `Problema: ${lastInquiry.problem}`);
     Linking.openURL(buildWhatsappLink(settings.phone, lines.join("\n"))).catch(() => {});
+  };
+
+  const decodeVin = async (vinValue: string) => {
+    const v = vinValue.trim().toUpperCase();
+    if (v.length < 11) {
+      setVinResult(null);
+      return;
+    }
+    setVinDecoding(true);
+    setVinResult(null);
+    try {
+      const r = await apiGet<{
+        make?: string | null;
+        model?: string | null;
+        year?: string | null;
+      }>(`/vin/decode/${v}`);
+      const matchedBrand = normalizeBrand(r.make ?? null);
+      const matchedModel = normalizeModel(matchedBrand, r.model ?? null);
+      // Fill in dropdowns if matches found
+      if (matchedBrand) setBrand(matchedBrand);
+      if (matchedModel) setModel(matchedModel);
+      if (r.year && CAR_YEARS.includes(r.year)) setYear(r.year);
+      const parts = [
+        matchedBrand || r.make || "",
+        matchedModel || r.model || "",
+        r.year || "",
+      ].filter(Boolean);
+      setVinResult({
+        success: !!matchedBrand || !!r.year,
+        label: parts.length > 0 ? parts.join(" ") : "Decodat",
+      });
+    } catch (e: any) {
+      setVinResult({ success: false, label: e?.message || "VIN nerecunoscut" });
+    } finally {
+      setVinDecoding(false);
+    }
+  };
+
+  const onVinChange = (t: string) => {
+    const upper = t.toUpperCase();
+    setVin(upper);
+    if (upper.length >= 11 && upper.length <= 17) {
+      // Debounced trigger: simple — call after 800ms of inactivity
+      // Using a closure-safe approach with setTimeout
+      window.clearTimeout((onVinChange as any)._t);
+      (onVinChange as any)._t = window.setTimeout(() => decodeVin(upper), 800);
+    } else {
+      setVinResult(null);
+    }
   };
 
   if (!settings) {
@@ -362,59 +417,148 @@ export default function Home() {
               </Field>
               <View style={isWide ? styles.row2 : undefined}>
                 <View style={isWide ? { flex: 1, marginRight: 16 } : undefined}>
-                  <Field label="SERIE ȘASIU (VIN) - OPȚIONAL">
+                  <Field label="SERIE ȘASIU (VIN) - OPȚIONAL · DECODARE AUTOMATĂ">
                     <TextInput
                       testID="vin-input"
                       value={vin}
-                      onChangeText={(t) => setVin(t.toUpperCase())}
-                      placeholder="WVWZZZ1KZAW... (dacă o ai)"
+                      onChangeText={onVinChange}
+                      placeholder="Scrie VIN-ul → completăm noi marca, modelul, anul"
                       placeholderTextColor={colors.textDisabled}
                       style={[styles.input, styles.inputMono]}
                       autoCapitalize="characters"
                       maxLength={17}
                     />
                   </Field>
+                  {vinDecoding && (
+                    <View style={styles.vinChip}>
+                      <ActivityIndicator size="small" color={colors.brand} />
+                      <Text style={styles.vinChipText}>Decodez VIN-ul...</Text>
+                    </View>
+                  )}
+                  {!!vinResult && !vinDecoding && (
+                    <View
+                      testID="vin-result"
+                      style={[
+                        styles.vinChip,
+                        { borderColor: vinResult.success ? colors.open : colors.break },
+                      ]}
+                    >
+                      <Ionicons
+                        name={vinResult.success ? "checkmark-circle" : "warning-outline"}
+                        size={16}
+                        color={vinResult.success ? colors.open : colors.break}
+                      />
+                      <Text style={styles.vinChipText}>
+                        {vinResult.success ? "Recunoscut: " : ""}{vinResult.label}
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </View>
 
-              <Text style={styles.helperLine}>SAU SELECTEAZĂ MAȘINA TA ↓</Text>
-
-              <View style={isWide ? styles.row3 : undefined}>
-                <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
-                  <Select
-                    testID="brand-select"
-                    label="MARCĂ"
-                    value={brand}
-                    placeholder="Alege marca"
-                    options={CAR_BRAND_LIST}
-                    onChange={(v) => {
-                      setBrand(v);
-                      setModel("");
-                    }}
-                  />
-                </View>
-                <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
-                  <Select
-                    testID="model-select"
-                    label="MODEL"
-                    value={model}
-                    placeholder={brand ? "Alege modelul" : "Alege întâi marca"}
-                    options={brand ? modelsForBrand(brand) : []}
-                    onChange={setModel}
-                    disabled={!brand}
-                  />
-                </View>
-                <View style={isWide ? { flex: 1 } : undefined}>
-                  <Select
-                    testID="year-select"
-                    label="AN FABRICAȚIE"
-                    value={year}
-                    placeholder="Alege anul"
-                    options={CAR_YEARS}
-                    onChange={setYear}
-                  />
+              <View style={styles.modeToggleRow}>
+                <Text style={styles.helperLine}>SAU SELECTEAZĂ MAȘINA TA ↓</Text>
+                <View style={styles.modeToggle}>
+                  <TouchableOpacity
+                    testID="mode-dropdown"
+                    onPress={() => setInputMode("dropdown")}
+                    style={[styles.modeBtn, inputMode === "dropdown" && styles.modeBtnActive]}
+                  >
+                    <Text style={[styles.modeText, inputMode === "dropdown" && styles.modeTextActive]}>
+                      DROPDOWN
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    testID="mode-manual"
+                    onPress={() => setInputMode("manual")}
+                    style={[styles.modeBtn, inputMode === "manual" && styles.modeBtnActive]}
+                  >
+                    <Text style={[styles.modeText, inputMode === "manual" && styles.modeTextActive]}>
+                      MANUAL
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </View>
+
+              {inputMode === "dropdown" ? (
+                <View style={isWide ? styles.row3 : undefined}>
+                  <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
+                    <Select
+                      testID="brand-select"
+                      label="MARCĂ"
+                      value={brand}
+                      placeholder="Alege marca"
+                      options={CAR_BRAND_LIST}
+                      onChange={(v) => {
+                        setBrand(v);
+                        setModel("");
+                      }}
+                    />
+                  </View>
+                  <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
+                    <Select
+                      testID="model-select"
+                      label="MODEL"
+                      value={model}
+                      placeholder={brand ? "Alege modelul" : "Alege întâi marca"}
+                      options={brand ? modelsForBrand(brand) : []}
+                      onChange={setModel}
+                      disabled={!brand}
+                    />
+                  </View>
+                  <View style={isWide ? { flex: 1 } : undefined}>
+                    <Select
+                      testID="year-select"
+                      label="AN FABRICAȚIE"
+                      value={year}
+                      placeholder="Alege anul"
+                      options={CAR_YEARS}
+                      onChange={setYear}
+                    />
+                  </View>
+                </View>
+              ) : (
+                <View style={isWide ? styles.row3 : undefined}>
+                  <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
+                    <Field label="MARCĂ">
+                      <TextInput
+                        testID="brand-manual"
+                        value={brand}
+                        onChangeText={setBrand}
+                        placeholder="ex: BMW"
+                        placeholderTextColor={colors.textDisabled}
+                        style={styles.input}
+                      />
+                    </Field>
+                  </View>
+                  <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
+                    <Field label="MODEL">
+                      <TextInput
+                        testID="model-manual"
+                        value={model}
+                        onChangeText={setModel}
+                        placeholder="ex: Seria 5 530d"
+                        placeholderTextColor={colors.textDisabled}
+                        style={styles.input}
+                      />
+                    </Field>
+                  </View>
+                  <View style={isWide ? { flex: 1 } : undefined}>
+                    <Field label="AN FABRICAȚIE">
+                      <TextInput
+                        testID="year-manual"
+                        value={year}
+                        onChangeText={setYear}
+                        placeholder="ex: 2015"
+                        placeholderTextColor={colors.textDisabled}
+                        style={styles.input}
+                        keyboardType="number-pad"
+                        maxLength={4}
+                      />
+                    </Field>
+                  </View>
+                </View>
+              )}
               <Field label="DESCRIE PROBLEMA *">
                 <TextInput
                   testID="problem-textarea"
@@ -776,6 +920,41 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     marginVertical: 8,
     textAlign: "center",
+  },
+  modeToggleRow: { alignItems: "center", marginVertical: 12 },
+  modeToggle: {
+    flexDirection: "row",
+    backgroundColor: colors.surfaceElevated,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modeBtn: { paddingVertical: 8, paddingHorizontal: 18 },
+  modeBtnActive: { backgroundColor: colors.brand },
+  modeText: {
+    fontFamily: "BarlowCondensed_700Bold",
+    color: colors.textSecondary,
+    letterSpacing: 2,
+    fontSize: 12,
+  },
+  modeTextActive: { color: "#fff" },
+  vinChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceElevated,
+    gap: 6 as any,
+  },
+  vinChipText: {
+    fontFamily: "IBMPlexSans_500Medium",
+    fontSize: 13,
+    color: "#fff",
+    marginLeft: 6,
   },
   field: { marginBottom: 20 },
   fieldLabel: {

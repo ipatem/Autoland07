@@ -43,14 +43,24 @@ interface Inquiry {
   resolved_at?: string | null;
 }
 
+interface Review {
+  id: string;
+  name: string;
+  rating: number;
+  text: string;
+  color: string;
+  created_at: string;
+}
+
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL || "";
 
 export default function Dashboard() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [tab, setTab] = useState<"inquiries" | "settings">("inquiries");
+  const [tab, setTab] = useState<"inquiries" | "reviews" | "settings">("inquiries");
   const [settings, setSettings] = useState<Settings | null>(null);
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
+  const [reviews, setReviews] = useState<Review[]>([]);
   const [stats, setStats] = useState<{ new: number; total: number }>({ new: 0, total: 0 });
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -60,15 +70,17 @@ export default function Dashboard() {
 
   const load = useCallback(async () => {
     try {
-      const [s, i, st] = await Promise.all([
+      const [s, i, st, rv] = await Promise.all([
         apiGet<Settings>("/settings"),
         apiGet<Inquiry[]>("/admin/inquiries", true),
         apiGet<{ new: number; total: number }>("/admin/inquiries/stats", true),
+        apiGet<Review[]>("/admin/reviews", true),
       ]);
       setSettings(s);
       setSettingsDraft(s);
       setInquiries(i);
       setStats(st);
+      setReviews(rv);
     } catch (e: any) {
       if (String(e?.message || "").includes("Token") || String(e?.message || "").includes("Neaut")) {
         await clearToken();
@@ -181,6 +193,31 @@ export default function Dashboard() {
     }
   };
 
+  const deleteReview = async (id: string) => {
+    const confirmed =
+      Platform.OS === "web"
+        ? // eslint-disable-next-line no-alert
+          (typeof window !== "undefined" && window.confirm("Sigur ștergi această recenzie?"))
+        : await new Promise<boolean>((resolve) =>
+            Alert.alert("Șterge recenzie", "Sigur ștergi această recenzie?", [
+              { text: "Anulează", style: "cancel", onPress: () => resolve(false) },
+              { text: "Șterge", style: "destructive", onPress: () => resolve(true) },
+            ]),
+          );
+    if (!confirmed) return;
+    try {
+      await apiDelete(`/admin/reviews/${id}`);
+      setReviews((prev) => prev.filter((x) => x.id !== id));
+    } catch (e: any) {
+      if (Platform.OS === "web") {
+        // eslint-disable-next-line no-alert
+        window.alert("Eroare: " + (e?.message || ""));
+      } else {
+        Alert.alert("Eroare", e?.message);
+      }
+    }
+  };
+
   if (loading || !settings || !settingsDraft) {
     return (
       <View style={styles.loading}>
@@ -251,6 +288,12 @@ export default function Dashboard() {
           badge={stats.new}
         />
         <TabBtn
+          testID="tab-reviews"
+          label={`RECENZII (${reviews.length})`}
+          active={tab === "reviews"}
+          onPress={() => setTab("reviews")}
+        />
+        <TabBtn
           testID="tab-settings"
           label="SETĂRI"
           active={tab === "settings"}
@@ -277,6 +320,17 @@ export default function Dashboard() {
                 onDelete={() => deleteInquiry(inq.id)}
                 onShare={() => shareReviewLink(inq)}
               />
+            ))
+          )
+        ) : tab === "reviews" ? (
+          reviews.length === 0 ? (
+            <View style={styles.empty}>
+              <Ionicons name="chatbubbles-outline" size={56} color={colors.textDisabled} />
+              <Text style={styles.emptyText}>Nu sunt recenzii momentan.</Text>
+            </View>
+          ) : (
+            reviews.map((r) => (
+              <ReviewRow key={r.id} review={r} onDelete={() => deleteReview(r.id)} />
             ))
           )
         ) : (
@@ -374,6 +428,36 @@ function StatusButton({
       <View style={[styles.statusBtnDot, { backgroundColor: color }]} />
       <Text style={[styles.statusBtnText, active && { color: "#000" }]}>{label}</Text>
     </TouchableOpacity>
+  );
+}
+
+function ReviewRow({ review, onDelete }: { review: Review; onDelete: () => void }) {
+  const date = new Date(review.created_at);
+  const dateStr = date.toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" });
+  const palette: Record<string, string> = {
+    yellow: "#FEF08A",
+    pink: "#FBCFE8",
+    cyan: "#BAE6FD",
+    green: "#D9F99D",
+  };
+  return (
+    <View testID={`review-${review.id}`} style={[styles.card, { borderLeftWidth: 4, borderLeftColor: palette[review.color] || "#fff" }]}>
+      <View style={styles.cardHead}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.cardName}>{review.name}</Text>
+          <Text style={styles.cardContact}>{"★".repeat(review.rating) + "☆".repeat(5 - review.rating)}</Text>
+        </View>
+        <TouchableOpacity
+          testID={`delete-review-${review.id}`}
+          style={styles.deleteBtn}
+          onPress={onDelete}
+        >
+          <Ionicons name="trash-outline" size={18} color={colors.closed} />
+        </TouchableOpacity>
+      </View>
+      <Text style={styles.cardProblem}>"{review.text}"</Text>
+      <Text style={styles.cardDate}>{dateStr}</Text>
+    </View>
   );
 }
 

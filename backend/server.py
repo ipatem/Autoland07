@@ -13,6 +13,7 @@ from typing import List, Optional
 
 import bcrypt
 import jwt
+import httpx
 from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -248,6 +249,44 @@ async def submit_public_review(payload: PublicReviewCreate):
     }
     await db.reviews.insert_one(doc)
     return ReviewOut(**{k: doc[k] for k in ("id", "name", "rating", "text", "color", "created_at")})
+
+
+@api_router.get("/vin/decode/{vin}")
+async def decode_vin(vin: str):
+    """Decode VIN using NHTSA vPIC public API (free, no key)."""
+    vin_clean = vin.strip().upper()
+    if len(vin_clean) < 11 or len(vin_clean) > 17:
+        raise HTTPException(status_code=400, detail="VIN trebuie să aibă între 11 și 17 caractere")
+    url = f"https://vpic.nhtsa.dot.gov/api/vehicles/decodevin/{vin_clean}?format=json"
+    try:
+        async with httpx.AsyncClient(timeout=8.0) as client_http:
+            r = await client_http.get(url)
+            r.raise_for_status()
+            data = r.json()
+    except Exception:
+        raise HTTPException(status_code=502, detail="Serviciul VIN momentan indisponibil")
+
+    results = {item["Variable"]: item["Value"] for item in data.get("Results", [])}
+    make_raw = (results.get("Make") or "").strip()
+    make = make_raw or None  # keep original casing (frontend normalizes)
+    model = (results.get("Model") or "").strip() or None
+    model_year = (results.get("Model Year") or "").strip() or None
+    series = (results.get("Series") or "").strip() or None
+    body = (results.get("Body Class") or "").strip() or None
+    fuel = (results.get("Fuel Type - Primary") or "").strip() or None
+
+    if not make and not model_year:
+        raise HTTPException(status_code=404, detail="VIN nerecunoscut. Completează manual marca și modelul.")
+
+    return {
+        "vin": vin_clean,
+        "make": make,
+        "model": model,
+        "year": model_year,
+        "series": series or None,
+        "body": body or None,
+        "fuel": fuel or None,
+    }
 
 
 # --- Auth endpoints ---

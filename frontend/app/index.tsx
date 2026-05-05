@@ -52,6 +52,17 @@ const POSTIT_ROTATIONS = ["-3deg", "2deg", "-1deg", "4deg", "-2deg", "3deg", "-4
 
 const GOOGLE_MAPS_URL = "https://maps.app.goo.gl/6KXoWbW8smUsgBKSA";
 
+const FALLBACK_SETTINGS: Settings = {
+  phone: "+40 753 017 291",
+  email: "autoland07@yahoo.com",
+  address: "Nicolae Titulescu nr. 78bis, 120159 Buzău, România",
+  schedule_weekday: "08:30 - 17:00",
+  schedule_saturday: "08:30 - 12:00",
+  schedule_sunday: "Închis",
+  status: "open",
+  status_message: "",
+};
+
 function buildWhatsappLink(phone: string, body: string) {
   const num = phone.replace(/[^0-9]/g, "");
   return `https://wa.me/${num}?text=${encodeURIComponent(body)}`;
@@ -104,17 +115,35 @@ export default function Home() {
     });
   }, []);
 
+const FALLBACK_SETTINGS: Settings = {
+  phone: "+40 753 017 291",
+  email: "autoland07@yahoo.com",
+  address: "Nicolae Titulescu nr. 78bis, 120159 Buzău, România",
+  schedule_weekday: "08:30 - 17:00",
+  schedule_saturday: "08:30 - 12:00",
+  schedule_sunday: "Închis",
+  status: "open",
+  status_message: "",
+};
+
   const load = useCallback(async () => {
-    try {
-      const [s, r] = await Promise.all([
-        apiGet<Settings>("/settings"),
-        apiGet<Review[]>("/reviews"),
-      ]);
-      setSettings(s);
-      setReviews(r);
-    } catch (e: any) {
-      console.warn("load error", e?.message);
+    const [s, r] = await Promise.allSettled([
+      apiGet<Settings>("/settings"),
+      apiGet<Review[]>("/reviews"),
+    ]);
+    if (s.status === "fulfilled") {
+      setSettings(s.value);
+    } else if (!settings) {
+      // First-load failure: render with safe defaults so UI is never stuck on spinner
+      setSettings(FALLBACK_SETTINGS);
+      console.warn("settings load failed, using fallback", s.reason?.message);
     }
+    if (r.status === "fulfilled") {
+      setReviews(r.value);
+    } else {
+      console.warn("reviews load failed", r.reason?.message);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {

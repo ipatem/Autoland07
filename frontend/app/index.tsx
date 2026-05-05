@@ -1145,6 +1145,14 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     textAlign: "center",
   },
+  scrollHint: {
+    fontFamily: "BarlowCondensed_700Bold",
+    color: colors.brand,
+    fontSize: 13,
+    letterSpacing: 2,
+    marginTop: 20,
+    textAlign: "center",
+  },
 
   reviewFormBox: {
     backgroundColor: colors.surfaceElevated,

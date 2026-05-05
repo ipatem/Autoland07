@@ -9,9 +9,9 @@ import {
   TextInput,
   Alert,
   RefreshControl,
-  Modal,
   Platform,
   Share,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -66,8 +66,6 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [settingsDraft, setSettingsDraft] = useState<Settings | null>(null);
   const [savingSettings, setSavingSettings] = useState(false);
-  const [shareModal, setShareModal] = useState<Inquiry | null>(null);
-
   const load = useCallback(async () => {
     try {
       const [s, i, st, rv] = await Promise.all([
@@ -161,32 +159,24 @@ export default function Dashboard() {
       const updated = await apiPost<Inquiry>(`/admin/inquiries/${id}/resolve`, {}, true);
       setInquiries((prev) => prev.map((x) => (x.id === id ? updated : x)));
       setStats((s) => ({ ...s, new: Math.max(0, s.new - 1) }));
-      setShareModal(updated);
     } catch (e: any) {
       Alert.alert("Eroare", e?.message);
     }
   };
 
   const deleteInquiry = async (id: string) => {
-    const confirmed =
-      Platform.OS === "web"
-        ? // eslint-disable-next-line no-alert
-          (typeof window !== "undefined" && window.confirm("Sigur ștergi această cerere?"))
-        : await new Promise<boolean>((resolve) =>
-            Alert.alert("Șterge cerere", "Sigur ștergi această cerere?", [
-              { text: "Anulează", style: "cancel", onPress: () => resolve(false) },
-              { text: "Șterge", style: "destructive", onPress: () => resolve(true) },
-            ]),
-          );
-    if (!confirmed) return;
+    // Instant delete with optimistic UI - no confirmation popup (user complained it didn't work).
+    const prev = inquiries;
+    setInquiries((p) => p.filter((x) => x.id !== id));
+    setStats((s) => ({ ...s, total: Math.max(0, s.total - 1) }));
     try {
       await apiDelete(`/admin/inquiries/${id}`);
-      setInquiries((prev) => prev.filter((x) => x.id !== id));
-      setStats((s) => ({ ...s, total: Math.max(0, s.total - 1) }));
     } catch (e: any) {
+      // Restore on error
+      setInquiries(prev);
       if (Platform.OS === "web") {
         // eslint-disable-next-line no-alert
-        window.alert("Eroare: " + (e?.message || ""));
+        window.alert("Eroare la ștergere: " + (e?.message || ""));
       } else {
         Alert.alert("Eroare", e?.message);
       }
@@ -194,21 +184,12 @@ export default function Dashboard() {
   };
 
   const deleteReview = async (id: string) => {
-    const confirmed =
-      Platform.OS === "web"
-        ? // eslint-disable-next-line no-alert
-          (typeof window !== "undefined" && window.confirm("Sigur ștergi această recenzie?"))
-        : await new Promise<boolean>((resolve) =>
-            Alert.alert("Șterge recenzie", "Sigur ștergi această recenzie?", [
-              { text: "Anulează", style: "cancel", onPress: () => resolve(false) },
-              { text: "Șterge", style: "destructive", onPress: () => resolve(true) },
-            ]),
-          );
-    if (!confirmed) return;
+    const prev = reviews;
+    setReviews((p) => p.filter((x) => x.id !== id));
     try {
       await apiDelete(`/admin/reviews/${id}`);
-      setReviews((prev) => prev.filter((x) => x.id !== id));
     } catch (e: any) {
+      setReviews(prev);
       if (Platform.OS === "web") {
         // eslint-disable-next-line no-alert
         window.alert("Eroare: " + (e?.message || ""));
@@ -216,6 +197,23 @@ export default function Dashboard() {
         Alert.alert("Eroare", e?.message);
       }
     }
+  };
+
+  const openClientWhatsapp = (inquiry: Inquiry) => {
+    // Open empty WhatsApp chat with client's number — admin types own message.
+    const num = (inquiry.contact || "").replace(/[^0-9]/g, "");
+    if (!num || num.length < 8) {
+      if (Platform.OS === "web") {
+        // eslint-disable-next-line no-alert
+        window.alert("Contactul nu este un număr valid de telefon.");
+      } else {
+        Alert.alert("Atenție", "Contactul nu este un număr valid de telefon.");
+      }
+      return;
+    }
+    // Romanian numbers without country code: prepend 40
+    const finalNum = num.length === 10 && num.startsWith("0") ? "4" + num : num;
+    Linking.openURL(`https://wa.me/${finalNum}`).catch(() => {});
   };
 
   if (loading || !settings || !settingsDraft) {
@@ -231,9 +229,8 @@ export default function Dashboard() {
   const shareReviewLink = async (inq: Inquiry) => {
     if (!inq.review_token) return;
     const link = reviewLink(inq.review_token);
-    const message = `Salut ${inq.name}! Am rezolvat cererea ta la Autoland 07. Te rog lasă-ne o părere scurtă: ${link}`;
     try {
-      await Share.share({ message });
+      await Share.share({ message: link });
     } catch {}
   };
 
@@ -312,15 +309,16 @@ export default function Dashboard() {
               <Text style={styles.emptyText}>Nu sunt cereri momentan.</Text>
             </View>
           ) : (
-            inquiries.map((inq) => (
-              <InquiryCard
-                key={inq.id}
-                inquiry={inq}
-                onResolve={() => resolveInquiry(inq.id)}
-                onDelete={() => deleteInquiry(inq.id)}
-                onShare={() => shareReviewLink(inq)}
-              />
-            ))
+              inquiries.map((inq) => (
+                <InquiryCard
+                  key={inq.id}
+                  inquiry={inq}
+                  onResolve={() => resolveInquiry(inq.id)}
+                  onDelete={() => deleteInquiry(inq.id)}
+                  onShare={() => shareReviewLink(inq)}
+                  onWhatsapp={() => openClientWhatsapp(inq)}
+                />
+              ))
           )
         ) : tab === "reviews" ? (
           reviews.length === 0 ? (
@@ -342,38 +340,6 @@ export default function Dashboard() {
           />
         )}
       </ScrollView>
-
-      {/* SHARE REVIEW MODAL */}
-      <Modal visible={!!shareModal} transparent animationType="fade" onRequestClose={() => setShareModal(null)}>
-        <View style={styles.modalBackdrop}>
-          <View style={styles.modalCard}>
-            <Ionicons name="checkmark-circle" size={48} color={colors.open} />
-            <Text style={styles.modalTitle}>CERERE REZOLVATĂ</Text>
-            <Text style={styles.modalText}>
-              Trimite-i lui {shareModal?.name} link-ul de mai jos pentru a lăsa o părere care va apărea pe site
-              ca post-it.
-            </Text>
-            {shareModal?.review_token && (
-              <View style={styles.linkBox}>
-                <Text testID="review-link-text" style={styles.linkText} numberOfLines={1}>
-                  {reviewLink(shareModal.review_token)}
-                </Text>
-              </View>
-            )}
-            <TouchableOpacity
-              testID="share-review-button"
-              style={styles.modalBtn}
-              onPress={() => shareModal && shareReviewLink(shareModal)}
-            >
-              <Ionicons name="share-outline" size={18} color="#fff" />
-              <Text style={styles.modalBtnText}>TRIMITE PE WHATSAPP / SMS</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setShareModal(null)} style={styles.modalClose}>
-              <Text style={styles.modalCloseText}>ÎNCHIDE</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -466,15 +432,18 @@ function InquiryCard({
   onResolve,
   onDelete,
   onShare,
+  onWhatsapp,
 }: {
   inquiry: Inquiry;
   onResolve: () => void;
   onDelete: () => void;
   onShare: () => void;
+  onWhatsapp: () => void;
 }) {
   const isNew = inquiry.status === "new";
   const date = new Date(inquiry.created_at);
   const dateStr = date.toLocaleString("ro-RO", { dateStyle: "short", timeStyle: "short" });
+  const hasPhone = (inquiry.contact || "").replace(/[^0-9]/g, "").length >= 8;
 
   return (
     <View testID={`inquiry-${inquiry.id}`} style={[styles.card, isNew && styles.cardNew]}>
@@ -527,10 +496,19 @@ function InquiryCard({
               style={styles.shareBtn}
               onPress={onShare}
             >
-              <Ionicons name="share-outline" size={16} color="#fff" />
-              <Text style={styles.shareBtnText}>TRIMITE LINK RECENZIE</Text>
+              <Ionicons name="link-outline" size={16} color="#fff" />
+              <Text style={styles.shareBtnText}>COPIAZĂ LINK RECENZIE</Text>
             </TouchableOpacity>
           )
+        )}
+        {hasPhone && (
+          <TouchableOpacity
+            testID={`whatsapp-button-${inquiry.id}`}
+            style={styles.waBtn}
+            onPress={onWhatsapp}
+          >
+            <Ionicons name="logo-whatsapp" size={20} color="#fff" />
+          </TouchableOpacity>
         )}
         <TouchableOpacity
           testID={`delete-button-${inquiry.id}`}
@@ -777,6 +755,14 @@ const styles = StyleSheet.create({
     marginRight: 12,
   },
   shareBtnText: { fontFamily: "BarlowCondensed_700Bold", color: "#fff", letterSpacing: 1.5, marginLeft: 8, fontSize: 13 },
+  waBtn: {
+    width: 44,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#25D366",
+    marginRight: 8,
+  },
   deleteBtn: {
     width: 44,
     height: 44,

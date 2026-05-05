@@ -22,6 +22,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { apiGet, apiPost } from "../src/api";
 import { colors, statusLabels } from "../src/theme";
+import Select from "../src/Select";
+import { CAR_BRAND_LIST, modelsForBrand, CAR_YEARS } from "../src/cars";
 
 interface Settings {
   phone: string;
@@ -68,7 +70,9 @@ export default function Home() {
   const [name, setName] = useState("");
   const [contact, setContact] = useState("");
   const [vin, setVin] = useState("");
-  const [carModel, setCarModel] = useState("");
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
+  const [year, setYear] = useState("");
   const [problem, setProblem] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -123,12 +127,13 @@ export default function Home() {
       return;
     }
     setSubmitting(true);
+    const carModelStr = [brand, model, year].filter(Boolean).join(" ").trim();
     try {
       await apiPost("/inquiries", {
         name: name.trim(),
         contact: contact.trim(),
         vin: vin.trim() || undefined,
-        car_model: carModel.trim() || undefined,
+        car_model: carModelStr || undefined,
         problem: problem.trim(),
       });
       setSuccess(true);
@@ -136,7 +141,7 @@ export default function Home() {
         name: name.trim(),
         contact: contact.trim(),
         vin: vin.trim() || undefined,
-        car_model: carModel.trim() || undefined,
+        car_model: carModelStr || undefined,
         problem: problem.trim(),
       });
       setHasSubmittedEver(true);
@@ -144,7 +149,9 @@ export default function Home() {
       setName("");
       setContact("");
       setVin("");
-      setCarModel("");
+      setBrand("");
+      setModel("");
+      setYear("");
       setProblem("");
     } catch (e: any) {
       Alert.alert("Eroare", e?.message || "Nu am putut trimite cererea.");
@@ -317,6 +324,10 @@ export default function Home() {
                 <Ionicons name="logo-whatsapp" size={22} color="#fff" />
                 <Text style={styles.waForwardText}>TRIMITE ȘI PE WHATSAPP</Text>
               </TouchableOpacity>
+              <Text style={styles.waHint}>
+                📸  Poți atașa și o poză cu piesa veche în fereastra de WhatsApp care se va
+                deschide — o imagine ne ajută să identificăm exact piesa potrivită.
+              </Text>
               <TouchableOpacity
                 testID="send-another-button"
                 style={styles.secondaryBtn}
@@ -351,12 +362,12 @@ export default function Home() {
               </Field>
               <View style={isWide ? styles.row2 : undefined}>
                 <View style={isWide ? { flex: 1, marginRight: 16 } : undefined}>
-                  <Field label="SERIE ȘASIU (VIN)">
+                  <Field label="SERIE ȘASIU (VIN) - OPȚIONAL">
                     <TextInput
                       testID="vin-input"
                       value={vin}
                       onChangeText={(t) => setVin(t.toUpperCase())}
-                      placeholder="WVWZZZ1KZAW..."
+                      placeholder="WVWZZZ1KZAW... (dacă o ai)"
                       placeholderTextColor={colors.textDisabled}
                       style={[styles.input, styles.inputMono]}
                       autoCapitalize="characters"
@@ -364,17 +375,44 @@ export default function Home() {
                     />
                   </Field>
                 </View>
+              </View>
+
+              <Text style={styles.helperLine}>SAU SELECTEAZĂ MAȘINA TA ↓</Text>
+
+              <View style={isWide ? styles.row3 : undefined}>
+                <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
+                  <Select
+                    testID="brand-select"
+                    label="MARCĂ"
+                    value={brand}
+                    placeholder="Alege marca"
+                    options={CAR_BRAND_LIST}
+                    onChange={(v) => {
+                      setBrand(v);
+                      setModel("");
+                    }}
+                  />
+                </View>
+                <View style={isWide ? { flex: 1, marginRight: 12 } : undefined}>
+                  <Select
+                    testID="model-select"
+                    label="MODEL"
+                    value={model}
+                    placeholder={brand ? "Alege modelul" : "Alege întâi marca"}
+                    options={brand ? modelsForBrand(brand) : []}
+                    onChange={setModel}
+                    disabled={!brand}
+                  />
+                </View>
                 <View style={isWide ? { flex: 1 } : undefined}>
-                  <Field label="MODEL / AN">
-                    <TextInput
-                      testID="model-input"
-                      value={carModel}
-                      onChangeText={setCarModel}
-                      placeholder="ex: VW Golf 5 1.9 TDI 2008"
-                      placeholderTextColor={colors.textDisabled}
-                      style={styles.input}
-                    />
-                  </Field>
+                  <Select
+                    testID="year-select"
+                    label="AN FABRICAȚIE"
+                    value={year}
+                    placeholder="Alege anul"
+                    options={CAR_YEARS}
+                    onChange={setYear}
+                  />
                 </View>
               </View>
               <Field label="DESCRIE PROBLEMA *">
@@ -730,6 +768,15 @@ const styles = StyleSheet.create({
 
   form: { gap: 4 as any },
   row2: { flexDirection: "row" },
+  row3: { flexDirection: "row" },
+  helperLine: {
+    fontFamily: "BarlowCondensed_700Bold",
+    color: colors.textDisabled,
+    fontSize: 11,
+    letterSpacing: 2,
+    marginVertical: 8,
+    textAlign: "center",
+  },
   field: { marginBottom: 20 },
   fieldLabel: {
     fontFamily: "BarlowCondensed_700Bold",
@@ -910,6 +957,14 @@ const styles = StyleSheet.create({
     letterSpacing: 2,
     fontSize: 14,
     marginLeft: 8,
+  },
+  waHint: {
+    fontFamily: "IBMPlexSans_400Regular",
+    color: colors.textSecondary,
+    fontSize: 13,
+    marginTop: 12,
+    lineHeight: 19,
+    textAlign: "center",
   },
 
   reviewFormBox: {
